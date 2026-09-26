@@ -2,7 +2,7 @@
 
 Dusky carries a lantern home as the sun goes down. A browser platformer across 11 worlds of 4 levels each: every x-2 dives underground through a cellar door, and every x-4 is a fire fortress with a Gloomling boss at the end. Frame-exact NES-style movement physics, real-time lantern lighting, and art and music that are entirely procedural. No image or audio files.
 
-**▶ Play:** https://kapilsh.github.io/sundown-sprint/ (published from `main`). Press `F` for full screen.
+**▶ Play:** https://www.kapilsharma.dev/sundown-sprint/ (published from `main` via GitHub Pages). Press `F` for full screen.
 
 ![Dusky crossing a lava bridge past fire wheels in Cinderhorn's Forge](docs/screenshots/fire.webp)
 
