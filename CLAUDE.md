@@ -50,7 +50,7 @@ A **44-level game**: 11 worlds × 4 levels. Every x-2 goes underground: a short 
 
 Watch mode (`?watch=2-1`, the "Watch the bot play" button, or `V` on the level select) replays `levels/replays.json` through every built level.
 
-`?test` or the Test mode button: every built level unlocked, infinite lives, progress not saved, a jump-to menu, and in game `[` `]` for previous/next level and `R` to restart. `?level=2-3` starts a level directly.
+Test mode only exists in local development (localhost or file://); the published site always starts at the title with the player's own progress. `?test` or the Test mode button: every built level unlocked, infinite lives, progress not saved, a jump-to menu, and in game `[` `]` for previous/next level and `R` to restart. `?level=2-3` starts a level directly.
 
 ## Conventions
 
