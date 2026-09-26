@@ -30,6 +30,8 @@ jobs:
         run: |
           mkdir _site
           cp -r index.html src levels _site/
+          # the bot's recorded runs are for local Watch mode only
+          rm -f _site/levels/replays.json
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

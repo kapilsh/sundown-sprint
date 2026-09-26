@@ -46,11 +46,11 @@ const exists = i => i >= 0 && i < 44 && index.some(e => e.id === idOf(i));
 
 // ---------- state ----------
 const params = new URLSearchParams(location.search);
-// Test mode (all levels, infinite lives, ?test, ?level=) only exists in local development.
-// The published site always starts from the title and the player's own progress.
+// Test mode (all levels, infinite lives, ?test, ?level=) and Watch mode (the bot playing) only
+// exist in local development. The published site always starts from the title and the player's own progress.
 const DEV = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname) || location.protocol === 'file:';
 const G = { mode: 'title', t: 0, sel: 0, cur: 0, W: null, test: DEV && (params.has('test') || params.has('level')), debug: false, assist: true, fade: 0, loading: false,
-  demo: null, carry: null, feed: null, watch: null, toast: null };
+  demo: null, carry: null, feed: null, watch: null, toast: null, dev: DEV };
 const cv = document.getElementById('screen');
 // opaque canvas: the browser can skip blending the page behind it
 R.cv = cv; R.ctx = cv.getContext('2d', { alpha: false });
@@ -89,6 +89,7 @@ async function loadReplays() {
   return replays;
 }
 async function watchLevel(i, playlist) {
+  if (!DEV) return false;
   const r = await loadReplays(), path = r[idOf(i)];
   if (!path) { playSfx('deny'); G.toast = { text: `No bot run recorded for ${idOf(i)} yet (npm run replays)`, t: 180 }; if (G.mode !== 'select') toSelect(); return false; }
   const W = G.W, carry = playlist && W && G.watch ? { score: W.score, gems: W.gems, lives: W.lives, glow: false } : freshRun();
@@ -314,7 +315,7 @@ cv.addEventListener('pointerdown', () => { audioInit(); cv.focus(); if (['title'
 initInput(cv, {
   onFirst: audioInit,
   onKey: e => {
-    if (e.code === 'KeyV' && G.mode === 'select') keyWatch = true;
+    if (e.code === 'KeyV' && G.mode === 'select' && DEV) keyWatch = true;
     if (e.code === 'KeyF') toggleFullscreen();
     if (e.code === 'KeyM') toggleMusic(); if (e.code === 'KeyH') toggleDebug(); if (e.code === 'KeyG') toggleAssist();
     if (!G.test || !G.W || !['play', 'paused', 'cleared', 'over', 'intro'].includes(G.mode)) return;
@@ -331,10 +332,11 @@ async function boot() {
   try { index = await (await fetch('levels/index.json')).json(); } catch (e) { console.error('could not load levels/index.json', e); }
   tSel.innerHTML = index.map(e => `<option value="${e.id}">${e.id}  ${e.name}</option>`).join('');
   setTest(G.test);
+  if (!DEV) bW.hidden = true;
   setTheme('hills'); resize();
   try { const lv = await fetchLevel('1-1'); G.demo = createWorld(lv, { fx: false }); G.demo.camX = 0; } catch (_) {}
   const want = DEV ? params.get('level') : null;
-  if (params.has('watch')) { const w = params.get('watch') || want || '1-1'; if (exists(idxOf(w))) watchLevel(idxOf(w), true); }
+  if (DEV && params.has('watch')) { const w = params.get('watch') || want || '1-1'; if (exists(idxOf(w))) watchLevel(idxOf(w), true); }
   else if (want && exists(idxOf(want))) startLevel(idxOf(want), freshRun());
   let last = performance.now(), accT = 0; const DT = 1000 / 60;
   function frame(now) {

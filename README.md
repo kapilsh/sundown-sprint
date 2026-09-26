@@ -25,7 +25,7 @@ Dusky carries a lantern home as the sun goes down. A browser platformer across 1
 - Swimming, ice, conveyors, springs, moving and falling platforms, wind, meteors, kickable shells, fire wheels, fire jets, lava, checkpoints.
 - A deterministic 60 Hz sim with integer SMB1 physics. Optional modern assists (coyote time, jump buffer) or strict 1985 rules.
 - Keyboard, gamepad and touch. Full screen. Progress saved in the browser.
-- Watch mode: a bot plays any level for you. Every level is proven beatable by that same bot.
+- Every level is proven beatable by a bot that plays the real game.
 - Renders at up to 1200p. On slow devices it lowers grain and resolution to hold the frame rate.
 
 ## Development
@@ -36,6 +36,8 @@ npm test         # physics golden traces, level structure, and every recorded bo
 npm run solve    # bot plays every level to prove it can be finished
 npm run levels   # regenerate levels/*.json from tools/
 ```
+
+Test mode and Watch mode (the bot playing any level for you) exist only when the game runs locally; the published site has neither.
 
 No dependencies. Needs Node 20+ for the tools; the game itself is static files. See `CLAUDE.md` for the architecture.
 

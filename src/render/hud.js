@@ -106,7 +106,7 @@ export function drawSelect(G, index, save) {
   const open = e && (G.test || G.sel <= save.unlocked);
   const info = e ? (open ? `${id}  ${e.name}${save.best[id] ? `  ·  best ${save.best[id]}` : ''}` : `${id}  locked: clear the level before it`) : `${id}  not built yet`;
   ctext(info, VH - 22, `700 9px ${FONT}`, open ? '#efeaff' : '#8a82b0');
-  ctext(G.test ? 'TEST MODE  ·  arrows pick  ·  Enter play  ·  V watch the bot  ·  [ ] skip levels in game' : 'Arrows pick  ·  Enter play  ·  V watch the bot  ·  Esc title', VH - 10, `500 7px ${FONT}`, G.test ? '#4fd8c8' : '#a59cc9');
+  ctext(G.test ? 'TEST MODE  ·  arrows pick  ·  Enter play  ·  V watch the bot  ·  [ ] skip levels in game' : G.dev ? 'Arrows pick  ·  Enter play  ·  V watch the bot  ·  Esc title' : 'Arrows pick  ·  Enter play  ·  Esc title', VH - 10, `500 7px ${FONT}`, G.test ? '#4fd8c8' : '#a59cc9');
   ctx.textBaseline = 'alphabetic';
 }
 
