@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Physics golden traces, level structure, and every recorded bot run still finishing its level.
+      - run: npm test
+      # The level JSON is generated from tools/; fail if someone edited one without the other.
+      - name: Levels match their generators
+        run: |
+          node tools/gen-levels.mjs > /dev/null
+          git diff --exit-code levels/

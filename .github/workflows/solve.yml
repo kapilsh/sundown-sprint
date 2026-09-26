@@ -1,0 +1,20 @@
+name: Solve levels
+
+# The beam-search bot plays every level with the real sim. Slow (minutes per level), so it runs
+# on demand, one job per world in parallel. Use it after changing physics, the sim or level tools.
+on:
+  workflow_dispatch:
+
+jobs:
+  solve:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        world: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node tools/solve.mjs ${{ matrix.world }}-1 ${{ matrix.world }}-2 ${{ matrix.world }}-3 ${{ matrix.world }}-4

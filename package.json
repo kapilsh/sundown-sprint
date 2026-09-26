@@ -1,0 +1,14 @@
+{
+  "name": "sundown-sprint",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Sundown Sprint: a browser-native 2D platformer. Dusky carries a lantern home at dusk.",
+  "scripts": {
+    "dev": "node tools/serve.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "levels": "node tools/gen-levels.mjs",
+    "solve": "node tools/solve.mjs",
+    "replays": "node tools/solve.mjs --out levels/replays.json"
+  }
+}
