@@ -52,6 +52,14 @@ Watch mode (`?watch=2-1`, the "Watch the bot play" button, or `V` on the level s
 
 Test mode only exists in local development (localhost or file://); the published site always starts at the title with the player's own progress. `?test` or the Test mode button: every built level unlocked, infinite lives, progress not saved, a jump-to menu, and in game `[` `]` for previous/next level and `R` to restart. `?level=2-3` starts a level directly.
 
+## Rendering and performance
+
+- Frame budget matters: nothing per frame should create gradients or patterns. Lights draw one cached sprite (`R.LIGHT`) into a quarter-resolution light map; blooms use one cached sprite per colour; grain is pre-baked frames drawn crisp; the vignette is stamped into the light map.
+- Sky and parallax render into `R.BG`, capped at 2 device px per world px, then scale up. Tiles and actors stay at full resolution.
+- The loop only renders when the sim advanced, so 120/144 Hz screens don't redraw identical frames.
+- Automatic quality (`Q` in `main.js`): learns the screen's frame interval, and if play runs slower, drops grain, then steps the canvas down 1080 → 840 → 720 → 600 → 480. Only steps down.
+- `window.__game.bench(n)` times n sim steps and n renders (plus forced-raster renders) in the current scene. Measure before and after any rendering change; a cache that is slower than the draw it replaces has happened before (parallax strips).
+
 ## Conventions
 
 - Keep everything drawable procedurally. No external asset downloads at runtime except Google Fonts.

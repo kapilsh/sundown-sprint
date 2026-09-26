@@ -5,6 +5,7 @@ import { createWorld, step, updateCamera } from './sim.js';
 import { THEMES } from './themes.js';
 import { R, VH } from './render/ctx.js';
 import { buildTiles } from './render/tiles.js';
+import { buildBuffers, drawBlooms, drawOverlay } from './render/sprites.js';
 import { drawSky, drawUnderBg } from './render/sky.js';
 import { FX, resetFx, consumeEvents, updateFx, drawParts, drawPops, drawAmbient } from './render/fx.js';
 import { drawDoors, drawFire, isUnder, drawCheckpoints, drawTiles, drawWater, drawGrass, drawGem, animHero, drawDusky, drawEnemy, drawItem, drawPlat, drawSpring, drawShot, drawBoss, drawPoleAndHut, drawForeground, drawLighting } from './render/world.js';
@@ -51,7 +52,8 @@ const DEV = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname) || l
 const G = { mode: 'title', t: 0, sel: 0, cur: 0, W: null, test: DEV && (params.has('test') || params.has('level')), debug: false, assist: true, fade: 0, loading: false,
   demo: null, carry: null, feed: null, watch: null, toast: null };
 const cv = document.getElementById('screen');
-R.cv = cv; R.ctx = cv.getContext('2d');
+// opaque canvas: the browser can skip blending the page behind it
+R.cv = cv; R.ctx = cv.getContext('2d', { alpha: false });
 
 function setTheme(id) {
   const th = THEMES[id] || THEMES.hills;
@@ -179,7 +181,7 @@ function renderWorld(W, opts = {}) {
   const { ctx, cv } = R;
   R.lights = []; R.blooms = [];
   const p = opts.prog ?? W.prog;
-  drawSky(p, W.camX); drawUnderBg(W);
+  drawBackdrop(p, W.camX, W);
   W.shake *= 0.86; if (W.shake < 0.05) W.shake = 0;
   worldXform(W, W.shake);
   drawPoleAndHut(W); drawCheckpoints(W); drawDoors(W); drawTiles(W); drawGrass(W);
@@ -196,11 +198,19 @@ function renderWorld(W, opts = {}) {
   const th = R.theme, dark = opts.dark ?? (th.dark[0] + p * th.dark[1]);
   drawLighting(W.camX, dark, W.lv.under);
   worldXform(W); ctx.globalCompositeOperation = 'lighter';
-  for (const [x, y, r, c] of R.blooms) { const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, c); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
+  drawBlooms();
   drawParts(true); ctx.globalCompositeOperation = 'source-over';
   ctx.setTransform(R.S, 0, 0, R.S, 0, 0); drawForeground(W.camX, W.lv.under);
-  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(R.VIG, 0, 0);
-  ctx.globalAlpha = 0.035; ctx.fillStyle = ctx.createPattern(R.GRAIN, 'repeat'); ctx.save(); ctx.translate(Math.random() * 160, Math.random() * 160); ctx.fillRect(-160, -160, cv.width + 160, cv.height + 160); ctx.restore(); ctx.globalAlpha = 1;
+  drawOverlay();
+}
+// Sky and parallax go into a buffer capped at 2 device px per world px, then get scaled up.
+// They are soft and far away, so the lower resolution doesn't show; it cuts their fill cost ~5x at 1080p.
+function drawBackdrop(p, camX, W) {
+  const main = R.ctx, S0 = R.S;
+  R.ctx = R.bgx; R.S = R.SB;
+  drawSky(p, camX); if (W) drawUnderBg(W);
+  R.ctx = main; R.S = S0;
+  main.setTransform(1, 0, 0, 1, 0, 0); main.drawImage(R.BG, 0, 0, R.cv.width, R.cv.height);
 }
 let selCam = 0;
 function render() {
@@ -212,7 +222,7 @@ function render() {
   }
   if (G.mode === 'select') {
     selCam += 0.4; R.lights = []; R.blooms = [];
-    drawSky(0.35, selCam);
+    drawBackdrop(0.35, selCam);
     ctx.setTransform(S, 0, 0, S, 0, 0); drawSelect(G, index, save); drawToast(); return;
   }
   const W = G.W; if (!W) return;
@@ -235,21 +245,32 @@ function drawToast() {
 // ---------- canvas & resolution ----------
 function resize() {
   const r = cv.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
-  let h = Math.floor((r.width * dpr * 9 / 16) / 120) * 120; h = clamp(h, 480, 1200);
+  let h = Math.floor((r.width * dpr * 9 / 16) / 120) * 120; h = clamp(h, 480, Math.min(1200, Q.maxH));
   const w = Math.round(h * 16 / 9);
   if (cv.width === w && cv.height === h) return;
   cv.width = w; cv.height = h; R.S = h / VH; R.VW = w / R.S;
-  R.LC = document.createElement('canvas'); R.LC.width = Math.ceil(w / 2); R.LC.height = Math.ceil(h / 2); R.lctx = R.LC.getContext('2d');
-  R.VIG = document.createElement('canvas'); R.VIG.width = w; R.VIG.height = h;
-  const v = R.VIG.getContext('2d'), g = v.createRadialGradient(w / 2, h * 0.55, h * 0.35, w / 2, h / 2, w * 0.72);
-  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(4,2,12,0.55)'); v.fillStyle = g; v.fillRect(0, 0, w, h);
-  R.GRAIN = document.createElement('canvas'); R.GRAIN.width = R.GRAIN.height = 160;
-  const gx = R.GRAIN.getContext('2d'), id = gx.createImageData(160, 160);
-  for (let i = 0; i < id.data.length; i += 4) { const n = Math.random() * 255; id.data[i] = id.data[i + 1] = id.data[i + 2] = n; id.data[i + 3] = 255; }
-  gx.putImageData(id, 0, 0);
+  buildBuffers(w, h);
   if (R.theme) buildTiles(R.theme);
 }
 new ResizeObserver(resize).observe(cv);
+
+// ---------- automatic quality ----------
+// If the device can't hold 60 fps during play, drop the film grain first, then the render
+// resolution one step at a time. Only ever steps down, and only while actually playing.
+// The first two seconds of play learn the screen's own frame interval (60, 50, 144 Hz...), so
+// "slow" means slower than this display, not slower than 60 fps.
+const Q = { maxH: 1200, ema: 16.7, slow: 0, steps: [1080, 840, 720, 600, 480], base: 0, n: 0 };
+function watchFrameRate(dt) {
+  if (G.mode !== 'play' || document.visibilityState !== 'visible' || dt > 100) return;
+  if (Q.n < 120) { Q.base += dt; if (++Q.n === 120) { Q.base = Math.max(6, Math.min(34, Q.base / 120)); Q.ema = Q.base; } return; }
+  Q.ema += (dt - Q.ema) * 0.05;
+  Q.slow = Q.ema > Math.max(Q.base * 1.2, Q.base + 3) ? Q.slow + 1 : Math.max(0, Q.slow - 2);
+  if (Q.slow < 120) return;
+  Q.slow = 0; Q.ema = Q.base;
+  if (!R.noGrain) { R.noGrain = true; return; }
+  const next = Q.steps.find(h => h < cv.height);
+  if (next) { Q.maxH = next; resize(); }
+}
 
 // ---------- page controls ----------
 const bS = document.getElementById('btnSound'), bD = document.getElementById('btnDebug'), bA = document.getElementById('btnAssist'), bT = document.getElementById('btnTest');
@@ -317,12 +338,25 @@ async function boot() {
   else if (want && exists(idxOf(want))) startLevel(idxOf(want), freshRun());
   let last = performance.now(), accT = 0; const DT = 1000 / 60;
   function frame(now) {
+    watchFrameRate(now - last);
     accT += Math.min(now - last, 250); last = now;
     let n = 0; while (accT >= DT && n < 5) { update(); accT -= DT; n++; } if (n === 5) accT = 0;
-    if (cv.width) render(); requestAnimationFrame(frame);
+    // draw only when the sim advanced: on 120/144 Hz screens the in-between frames would be identical
+    if (cv.width && !benchHold && n > 0) render(); requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 }
 boot();
 // exposed for automated checks (screenshots, smoke tests)
-window.__game = { G, R, startLevel: (id, carry) => startLevel(idxOf(id), carry || freshRun()), step: () => update(), render };
+let benchHold = false;
+// bench(n): pause the live loop, time n sim steps and n renders, report ms per frame.
+function bench(n = 240) {
+  benchHold = true;
+  const t0 = performance.now(); for (let i = 0; i < n; i++) update(); const t1 = performance.now();
+  for (let i = 0; i < n; i++) render(); const t2 = performance.now();
+  // the same again, but forcing each frame's pixels to be finished (true raster cost)
+  for (let i = 0; i < n; i++) { render(); R.ctx.getImageData(0, 0, 1, 1); } const t3 = performance.now();
+  benchHold = false;
+  return { update: +((t1 - t0) / n).toFixed(3), render: +((t2 - t1) / n).toFixed(3), full: +((t3 - t2) / n).toFixed(3), lights: R.lights.length, blooms: R.blooms.length, px: `${cv.width}x${cv.height}` };
+}
+window.__game = { G, R, Q, startLevel: (id, carry) => startLevel(idxOf(id), carry || freshRun()), step: () => update(), render, bench };

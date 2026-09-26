@@ -479,7 +479,7 @@ export function drawLighting(camX, dark, under) {
   lctx.fillStyle = `rgba(10,6,34,${dark})`; lctx.fillRect(0, 0, LC.width, LC.height);
   if (under) {
     // underground is darker; fade the edge over a tile so the tunnel mouth is soft
-    const k = S / 2, a = Math.max(0, under[0] * 16 - camX) * k, z = Math.min(VW, (under[1] + 1) * 16 - camX) * k;
+    const k = S * LC.width / cv.width, a = Math.max(0, under[0] * 16 - camX) * k, z = Math.min(VW, (under[1] + 1) * 16 - camX) * k;
     if (z > a) {
       const extra = Math.max(0, 0.62 - dark), g = lctx.createLinearGradient(a - 16 * k, 0, z + 16 * k, 0);
       const e = Math.min(0.5, 16 * k / Math.max(1, z - a + 32 * k));
@@ -487,13 +487,14 @@ export function drawLighting(camX, dark, under) {
       lctx.fillStyle = g; lctx.fillRect(a - 16 * k, 0, z - a + 32 * k, LC.height);
     }
   }
+  lctx.drawImage(R.VIG, 0, 0);
   lctx.globalCompositeOperation = 'destination-out';
-  const k = S / 2; lctx.setTransform(k, 0, 0, k, -camX * k, 0);
+  const k = S * LC.width / cv.width; lctx.setTransform(k, 0, 0, k, -camX * k, 0);
   for (const [x, y, r, a] of R.lights) {
-    if (x + r < camX || x - r > camX + VW) continue;
-    const g = lctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(0.5, `rgba(0,0,0,${a * 0.45})`); g.addColorStop(1, 'rgba(0,0,0,0)');
-    lctx.fillStyle = g; lctx.fillRect(x - r, y - r, r * 2, r * 2);
+    if (x + r < camX || x - r > camX + VW || a <= 0.01) continue;
+    lctx.globalAlpha = Math.min(1, a); lctx.drawImage(R.LIGHT, x - r, y - r, r * 2, r * 2);
   }
+  lctx.globalAlpha = 1;
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(LC, 0, 0, cv.width, cv.height);
 }
 
