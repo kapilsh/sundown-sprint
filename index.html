@@ -60,6 +60,7 @@
   .pad .group { display: flex; gap: 12px; }
   .pad button { font-family: var(--display); font-weight: 700; font-size: 18px; color: var(--ink); background: var(--panel); border: 2px solid var(--panel-edge); border-radius: 50%; width: 66px; height: 66px; touch-action: none; }
   .pad button.act { background: #3a2716; border-color: var(--amber); color: var(--amber); }
+  .pad button.fire { background: #3a1a16; border-color: #ff6a4a; color: #ff8a6a; }
   .pad button.on { filter: brightness(1.6); }
   @media (pointer: coarse) { .pad { display: flex; } }
   /* full screen: the game fills the screen at 16:9; touch controls float over it */
@@ -95,7 +96,7 @@
 
   <div class="pad" id="pad" aria-hidden="true">
     <div class="group"><button data-k="left">◀</button><button data-k="right">▶</button></div>
-    <div class="group"><button data-k="run" class="act">B</button><button data-k="jump" class="act">A</button></div>
+    <div class="group"><button data-k="fire" class="act fire" aria-label="Fire">✹</button><button data-k="run" class="act">B</button><button data-k="jump" class="act">A</button></div>
   </div>
   </div>
 
@@ -116,13 +117,14 @@
       <dl>
         <dt><kbd>←</kbd><kbd>→</kbd></dt><dd>Walk (or A / D)</dd>
         <dt><kbd>Z</kbd><kbd>Space</kbd></dt><dd>Jump. Hold for height. Tap to swim</dd>
-        <dt><kbd>X</kbd><kbd>Shift</kbd></dt><dd>Run</dd>
+        <dt><kbd>X</kbd><kbd>Shift</kbd></dt><dd>Run · tap to throw an ember (with the fire blossom)</dd>
+        <dt><kbd>S</kbd><kbd>C</kbd></dt><dd>Fire: hold to keep throwing embers</dd>
         <dt><kbd>Enter</kbd></dt><dd>Start and pause</dd>
         <dt><kbd>Esc</kbd></dt><dd>Pause, then back to level select</dd>
         <dt><kbd>F</kbd></dt><dd>Full screen</dd>
         <dt><kbd>M</kbd> <kbd>H</kbd> <kbd>G</kbd></dt><dd>Music, physics readout, assists</dd>
       </dl>
-      <p class="note">Gamepads work. Stomp mossbugs, duskmoths and pebblesnails (kick the shell!). Avoid thornlings. The ember crate makes Dusky glow: bricks shatter and one hit is forgiven.</p>
+      <p class="note">Gamepads work. Stomp mossbugs, duskmoths and pebblesnails (kick the shell!). Avoid thornlings. The ember crate makes Dusky glow: bricks shatter and one hit is forgiven. Hit another ember crate while glowing for the fire blossom, then tap Run to throw a bouncing ember, or hold Fire (<kbd>S</kbd>, a gamepad shoulder button, or ✹ on touch) to keep throwing, up to five at a time. Four embers cost a boss one heart.</p>
     </section>
 
     <section class="card" id="testCard">

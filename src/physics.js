@@ -17,3 +17,6 @@ export const SHELL_KICK = 0x03000;
 
 export const hex = n => '0x' + n.toString(16).toUpperCase().padStart(5, '0');
 export const jumpParams = s => JUMPS.find(j => s < j.lim);
+// Thrown embers (the fire-blossom power). Bounce along the floor, burst on walls, at most MAX alive.
+// Holding the fire button throws again every AUTO frames while a slot is free.
+export const FIREBALL = { VX: 0x04000, VY: 0x02000, GRAV: 0x00500, MAX_FALL: 0x04000, BOUNCE: 0x03400, MAX: 5, AUTO: 12, BOSS_HITS: 4 };

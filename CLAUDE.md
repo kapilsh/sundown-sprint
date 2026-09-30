@@ -14,6 +14,7 @@ A **44-level game**: 11 worlds × 4 levels. Every x-2 goes underground: a short 
 
 - **Physics stays SMB1-exact.** `P` and `JUMPS` in `src/physics.js` hold the reverse-engineered SMB1 constants, in units of 1/4096 px per frame. Positions and velocities are integers. The sim ticks at a fixed 60 Hz, and rendering is decoupled. `tests/physics.test.mjs` replays golden traces recorded from the original prototype (on its frozen map, `tests/golden/level-duskrunner.json`) and must stay bit-exact.
 - **Additions** that SMB1 never had on land (swimming, springs, ice, conveyors, wind, shells) live in `SWIM`/`SPRING`/`ICE`/`CONVEYOR` and only apply where those tiles or entities exist. Fire hazards (`firebar`, `jet` entities) are pure functions of the frame count (`fireballs()`, `jetPhase()` in `sim.js`), so the renderer and the sim always agree.
+- **Thrown embers** (the fire blossom, SMB1's fire flower tier): an ember crate hit while glowing drops a stationary blossom that sets `h.flame`. A Run or Fire press (`fireP` in the step input) throws an ember into `W.bolts`, and holding Fire (`fire`, keys S/C/L) keeps throwing every `FIREBALL.AUTO` frames; constants live in `FIREBALL`. The solver never throws, so every level stays beatable without it.
 - **"Modern assists"** (coyote time, jump buffer) are a toggle (`W.assist`). Strict mode must still behave like 1985.
 - **Hitboxes are fixed** (`HOX/HW/HOY/HH` for the hero; 14px bodies for enemies). Squash/stretch is visual only.
 - **All art is original and procedural.** No Nintendo sprites, names, music, or recognizable level layouts.
@@ -25,7 +26,7 @@ A **44-level game**: 11 worlds × 4 levels. Every x-2 goes underground: a short 
 |---|---|
 | `src/physics.js` | `P`, `JUMPS`, extension constants |
 | `src/sim.js` | **Pure deterministic gameplay** (no DOM, audio or `Math.random`). `createWorld(level)`, `step(W, input)`, `cloneWorld`. Visual side effects go out as events in `W.ev` |
-| `src/tiles.js` | Tile chars. `G` ground, `B` brick, `M` multi-gem brick, `C` gem crate, `E` ember crate, `N` lantern (1-up) crate, `U` used, `S` stone, `L/R/l/r` pillar, `-` one-way ledge, `~` water, `V` lava, `^` spikes, `I` ice, `<` `>` conveyors, `X` boss gate |
+| `src/tiles.js` | Tile chars. `G` ground, `B` brick, `M` multi-gem brick, `C` gem crate, `E` ember crate (glow, or the fire blossom if already glowing), `N` lantern (1-up) crate, `U` used, `S` stone, `L/R/l/r` pillar, `-` one-way ledge, `~` water, `V` lava, `^` spikes, `I` ice, `<` `>` conveyors, `X` boss gate |
 | `src/themes.js` | One theme per world: sky stops, parallax styles, tile palette, darkness, ambient particles, music voicing |
 | `src/render/*` | `tiles` (cached per theme), `sky` (parallax styles), `world` (tiles, Dusky, enemies, bosses, goal, lighting), `fx` (particles from sim events), `hud` (HUD, level select, cards) |
 | `src/audio.js` | Synth SFX and the music loop. Each world re-voices the same D-dorian melody |

@@ -82,7 +82,7 @@ function lavaFloor(b, c0, c1) { for (let c = c0; c < c1; c++) if (b.get(c, 14) =
 //         boss (x-4 config), post(b, W), extra meta (wind, meteors) }
 export function compose(Builder, spec) {
   const b = new Builder(1200), rng = mulberry(spec.seed), x = { rng, d: spec.d, foes: spec.foes, lava: !!spec.lava };
-  let c = S.run(b, 0, 14, { blocks: [[8, 9, 'BCB']] });
+  let c = S.run(b, 0, 14, { blocks: [[8, 9, 'BEB']] });
   const bag = Object.entries(spec.pieces).flatMap(([k, w]) => Array(w).fill(k));
   const cps = [], ncp = spec.boss ? 2 : 1, sig = [...(spec.sig || [])].sort((a, z) => a[0] - z[0]);
   let last = '', gaps = 0;
@@ -107,6 +107,12 @@ export function compose(Builder, spec) {
     pole = boss.c0 + 38; b.set(pole, 12, 'S'); hut = pole + 4;
   } else ({ pole, hut } = S.endZone(b, c + 2));
   if (spec.post) spec.post(b, pole);
+  // past each checkpoint, the first gem crate becomes an ember crate: a second one gives the fire blossom
+  for (const cp of cps) {
+    const hit = [];
+    for (let cc = cp; cc < pole && !hit.length; cc++) for (let r = 0; r < 13; r++) if (b.get(cc, r) === 'C') { hit.push([cc, r]); break; }
+    if (hit.length) b.set(hit[0][0], hit[0][1], 'E');
+  }
   // x-2 levels: most of the level runs underground, surfacing before the goal
   const ug = spec.under ? S.underground(b, Math.round(spec.len * 0.1), (boss ? boss.c0 : pole) - 28) : null;
   return b.toJSON(S.meta(spec.id, spec.name, spec.theme, { sky: spec.sky, pole, hut, seed: spec.seed, checkpoints: cps, ...(boss ? { boss } : {}), ...(ug || {}), ...(spec.extra || {}) }));

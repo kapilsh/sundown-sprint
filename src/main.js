@@ -8,7 +8,7 @@ import { buildTiles } from './render/tiles.js';
 import { buildBuffers, drawBlooms, drawOverlay } from './render/sprites.js';
 import { drawSky, drawUnderBg } from './render/sky.js';
 import { FX, resetFx, consumeEvents, updateFx, drawParts, drawPops, drawAmbient } from './render/fx.js';
-import { drawDoors, drawFire, isUnder, drawCheckpoints, drawTiles, drawWater, drawGrass, drawGem, animHero, drawDusky, drawEnemy, drawItem, drawPlat, drawSpring, drawShot, drawBoss, drawPoleAndHut, drawForeground, drawLighting } from './render/world.js';
+import { drawDoors, drawFire, isUnder, drawCheckpoints, drawTiles, drawWater, drawGrass, drawGem, animHero, drawDusky, drawEnemy, drawItem, drawPlat, drawSpring, drawShot, drawBolt, drawBoss, drawPoleAndHut, drawForeground, drawLighting } from './render/world.js';
 import { drawHUD, drawTitle, drawSelect, drawIntro, drawOverlays } from './render/hud.js';
 import { audioInit, playSfx, musicStart, musicStop, musicPlaying, setMusicOn, audio, setAmbientChirps } from './audio.js';
 import { initInput, poll, inp, tapStart } from './input.js';
@@ -68,7 +68,7 @@ async function startLevel(i, carry, watch = null) {
     const lv = await fetchLevel(idOf(i));
     G.cur = i; G.sel = i;
     // Watch mode replays the solver's recorded inputs, which assume assists on and a fresh run.
-    G.W = createWorld(lv, { assist: watch ? true : G.assist, score: carry.score, gems: carry.gems, lives: carry.lives, glow: watch ? false : carry.glow, checkpoint: watch ? -1 : carry.cp ?? -1 });
+    G.W = createWorld(lv, { assist: watch ? true : G.assist, score: carry.score, gems: carry.gems, lives: carry.lives, glow: watch ? false : carry.glow, flame: watch ? false : carry.flame, checkpoint: watch ? -1 : carry.cp ?? -1 });
     if (watch) G.feed = pathInputs(watch.path);
     G.carry = carry;
     setTheme(lv.theme); resetFx(); musicStop();
@@ -136,7 +136,7 @@ function update() {
       return;
     }
     if (G.t > 40 && (inp.startP || inp.jumpBtnP)) {
-      if (G.mode === 'cleared' && exists(G.cur + 1)) startLevel(G.cur + 1, { score: W.score, gems: W.gems, lives: W.lives, glow: W.keepGlow });
+      if (G.mode === 'cleared' && exists(G.cur + 1)) startLevel(G.cur + 1, { score: W.score, gems: W.gems, lives: W.lives, glow: W.keepGlow, flame: W.keepFlame });
       else if (G.mode === 'cleared' && G.cur === 43) { G.mode = 'ending'; G.t = 0; }
       else toSelect();
     }
@@ -153,7 +153,7 @@ function update() {
   const fadeTo = (W.state === 'dying' && W.t > 120) || W.state === 'dead' ? 1 : 0; G.fade += (fadeTo - G.fade) * 0.1;
   if (W.state === 'door') G.fade = W.t < 24 ? W.t / 22 : Math.max(0, (48 - W.t) / 22);
   // G.feed (set by automated checks) replays recorded inputs instead of the live controls.
-  step(W, G.feed && G.feed.length ? G.feed.shift() : { left: inp.left, right: inp.right, jump: inp.jump, run: inp.run, jumpP: inp.jumpP });
+  step(W, G.feed && G.feed.length ? G.feed.shift() : { left: inp.left, right: inp.right, jump: inp.jump, run: inp.run, jumpP: inp.jumpP, fireP: inp.runP || inp.fireP, fire: inp.fire });
   consumeEvents(W, onSfx, onMusic);
   animHero(W); updateFx(W);
   // going underground (or back up) swaps the music
@@ -194,6 +194,7 @@ function renderWorld(W, opts = {}) {
   drawBoss(W); drawFire(W);
   if (!opts.noHero) drawDusky(W);
   for (const s of W.shots) drawShot(s);
+  for (const o of W.bolts) drawBolt(o);
   drawWater(W);
   drawParts(false); drawAmbient(p); drawPops();
   const th = R.theme, dark = opts.dark ?? (th.dark[0] + p * th.dark[1]);

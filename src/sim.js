@@ -1,7 +1,7 @@
 // =============== Simulation ===============
 // Pure, deterministic gameplay. No DOM, no audio, no Math.random. Runs in the browser and in Node
 // (tests, level solver). Everything that only affects visuals is pushed to W.ev as events.
-import { SUB, P, JUMPS, SWIM, SPRING, ICE, CONVEYOR, SHELL_KICK, jumpParams } from './physics.js';
+import { SUB, P, JUMPS, SWIM, SPRING, ICE, CONVEYOR, SHELL_KICK, FIREBALL, jumpParams } from './physics.js';
 import { SOLID } from './tiles.js';
 
 export const VIEW_W = 427, VH = 240, LH = 15;
@@ -18,9 +18,9 @@ export function createWorld(level, o = {}) {
     state: 'play', frame: 0, t: 0, time: level.time || 300, tick: 0,
     camX: 0, lookX: 0, lock: null, prog: 0,
     score: o.score || 0, gems: o.gems || 0, lives: o.lives ?? 3, assist: o.assist ?? true,
-    freeze: 0, shake: 0, lit: false, poleScore: 0, keepGlow: false,
+    freeze: 0, shake: 0, lit: false, poleScore: 0, keepGlow: false, keepFlame: false,
     ents: o.noEnemies ? [] : (level.ents || []).filter(e => SPAWNED.has(e.t)).sort((a, b) => a.c - b.c), spawnIdx: 0,
-    enemies: [], items: [], shots: [], boss: null, bossDone: !level.boss,
+    enemies: [], items: [], shots: [], bolts: [], boss: null, bossDone: !level.boss,
     plats: (level.ents || []).filter(e => e.t === 'plat' || e.t === 'fall').map(makePlat),
     springs: (level.ents || []).filter(e => e.t === 'spring').map(e => ({ x: e.c * 16, y: e.r * 16, sq: 0 })),
     gemList: (level.gems || []).map(([c, r]) => ({ x: c * 16 + 3, y: r * 16 + 2, got: false })),
@@ -32,17 +32,17 @@ export function createWorld(level, o = {}) {
     zones: level.zones || null, doors: (level.ents || []).filter(e => e.t === 'door'), door: null,
   };
   W.PX = W.LW * 16;
-  W.hero = newHero(W, !!o.glow);
+  W.hero = newHero(W, !!(o.glow || o.flame), !!o.flame);
   if (o.checkpoint >= 0 && W.cps[o.checkpoint] !== undefined) startAtCheckpoint(W, o.checkpoint);
   updateCamera(W, true);
   return W;
 }
 const SPAWNED = new Set(['bug', 'thorn', 'moth', 'hopper', 'snail', 'fish']);
 
-function newHero(W, glow) {
+function newHero(W, glow, flame) {
   const [sx, sy] = W.lv.start || [40, 192];
   return { x: sx * SUB, y: sy * SUB, vx: 0, vy: 0, ground: true, face: 1, hold: JUMPS[0].hold, fall: JUMPS[0].fall, airMax: P.MAX_WALK, takeoff: 0,
-    skid: false, glow, inv: 0, chain: 0, hidden: false, coyote: 0, buffer: 0, sx: 1, sy: 1, plat: null, wet: false, surface: '.', pit: false };
+    skid: false, glow, flame, throwT: 0, fireCD: 0, inv: 0, chain: 0, hidden: false, coyote: 0, buffer: 0, sx: 1, sy: 1, plat: null, wet: false, surface: '.', pit: false };
 }
 // Respawn at a mid-level lantern post: stand on the highest ground in that column, skip enemies behind it.
 function startAtCheckpoint(W, i) {
@@ -229,7 +229,8 @@ function hitBlock(W, c, r) {
   if (t === 'C' || t === 'E' || t === 'M' || t === 'N') {
     bumpTile(W, c, r);
     if (t === 'E' || t === 'N') {
-      W.g[r][c] = 'U'; W.items.push({ k: t === 'E' ? 'ember' : 'life', x: c * 16 * SUB, y: r * 16 * SUB, vx: 0, vy: 0, rise: 16 });
+      // an ember crate hit while already glowing holds a fire blossom instead (it stays put)
+      W.g[r][c] = 'U'; W.items.push({ k: t === 'N' ? 'life' : W.hero.glow ? 'flame' : 'ember', x: c * 16 * SUB, y: r * 16 * SUB, vx: 0, vy: 0, rise: 16 });
       sfx(W, t === 'E' ? 'ember' : 'crate'); emit(W, 'sparks', { x: c * 16 + 8, y: r * 16, n: 14, col: t === 'E' ? '#ffb65c' : '#ffe9a8' });
     } else {
       emit(W, 'gempop', { x: c * 16 + 3, y: r * 16 - 12 }); addGem(W); emit(W, 'sparks', { x: c * 16 + 8, y: r * 16, n: 8, col: '#9ffff2' });
@@ -251,13 +252,13 @@ function killOnTop(W, c, r) {
 function flipEnemy(W, e, pts) { e.dead = 'flip'; e.vy = -0x03000; e.vx = (e.x > W.hero.x ? 1 : -1) * 0x00800; addScore(W, pts, px(e.x) + 8, px(e.y)); sfx(W, 'stomp'); }
 function hurtHero(W) {
   const h = W.hero; if (h.inv > 0 || W.state !== 'play') return;
-  if (h.glow) { h.glow = false; h.inv = 120; sfx(W, 'hurt'); W.shake = 3; emit(W, 'sparks', { x: h.x / SUB + 8, y: h.y / SUB + 8, n: 20, col: '#ffb65c', spd: 2.4 }); }
+  if (h.glow) { h.glow = false; h.flame = false; h.inv = 120; sfx(W, 'hurt'); W.shake = 3; emit(W, 'sparks', { x: h.x / SUB + 8, y: h.y / SUB + 8, n: 20, col: '#ffb65c', spd: 2.4 }); }
   else killHero(W, false);
 }
 export function killHero(W, pit) {
   if (W.state !== 'play') return;
   const h = W.hero;
-  W.state = 'dying'; W.t = 0; h.glow = false; W.keepGlow = false; h.vx = 0; h.vy = pit ? 0 : -0x04000; h.pit = pit;
+  W.state = 'dying'; W.t = 0; h.glow = false; h.flame = false; W.keepGlow = false; W.keepFlame = false; h.vx = 0; h.vy = pit ? 0 : -0x04000; h.pit = pit;
   W.shake = pit ? 0 : 4; sfx(W, 'die'); emit(W, 'music', { on: false });
 }
 
@@ -362,12 +363,13 @@ function updateEnemies(W) {
 function updateItems(W) {
   const h = W.hero, hx = px(h.x) + HOX, hy = px(h.y) + HOY;
   for (const it of W.items) {
-    if (it.rise > 0) { it.y -= SUB / 2; it.rise -= 0.5; if (it.rise <= 0) it.vx = 0x00C00; continue; }
-    moveBody(W, it, 14, 1);
+    if (it.rise > 0) { it.y -= SUB / 2; it.rise -= 0.5; if (it.rise <= 0 && it.k !== 'flame') it.vx = 0x00C00; continue; }
+    if (it.k !== 'flame') moveBody(W, it, 14, 1);
     const ix = px(it.x), iy = px(it.y);
     if (hx < ix + 14 && hx + HW > ix + 2 && hy < iy + 14 && hy + HH > iy + 2) {
       it.gone = true;
       if (it.k === 'life') { W.lives++; sfx(W, 'oneup'); emit(W, 'pop', { x: ix + 8, y: iy, s: '1UP' }); emit(W, 'sparks', { x: ix + 8, y: iy + 8, n: 20, col: '#ffe9a8', spd: 2 }); }
+      else if (it.k === 'flame') { h.glow = true; h.flame = true; addScore(W, 1000, ix + 8, iy); sfx(W, 'blossom'); emit(W, 'sparks', { x: ix + 8, y: iy + 8, n: 28, col: '#ff6a3a', spd: 2.4 }); }
       else { h.glow = true; addScore(W, 1000, ix + 8, iy); sfx(W, 'ember'); emit(W, 'sparks', { x: ix + 8, y: iy + 8, n: 24, col: '#ffb65c', spd: 2.2 }); }
     }
     if (iy > VH + 16) it.gone = true;
@@ -434,13 +436,14 @@ function updateBoss(W) {
     for (let r = 0; r <= 12; r++) W.g[r][A.c0] = 'X';
     // drop in from above, or from just under the roof in caves
     let roof = 0; while (roof < 8 && SOLID.has(W.g[roof][A.c0 + 20])) roof++;
-    W.boss = { x: (A.c0 + 19) * 16 * SUB, y: (roof ? roof * 16 + 14 : -40) * SUB, vx: 0, vy: 0, hp: A.hp, max: A.hp, inv: 0, t: 0, ground: false, face: -1, dead: false, kind: A.kind };
+    W.boss = { x: (A.c0 + 19) * 16 * SUB, y: (roof ? roof * 16 + 14 : -40) * SUB, vx: 0, vy: 0, hp: A.hp, max: A.hp, inv: 0, burn: 0, flash: 0, t: 0, ground: false, face: -1, dead: false, kind: A.kind };
     sfx(W, 'gate'); emit(W, 'music', { boss: true }); W.shake = 2;
   }
   const b = W.boss; if (!b) return;
   b.t++;
   if (b.dead) { b.vy += 0x00500; b.x += b.vx; b.y += b.vy; if (px(b.y) > VH + 60) { W.boss = null; W.bossDone = true; } return; }
   if (b.inv > 0) b.inv--;
+  if (b.flash > 0) b.flash--;
   // Second phase at half health: faster, jumpier, one more seed per volley.
   const rage = b.hp <= Math.ceil(b.max / 2);
   if (rage && !b.raged) { b.raged = true; sfx(W, 'rage'); W.shake = 3; emit(W, 'sparks', { x: px(b.x) + 16, y: px(b.y), n: 24, col: '#f07a8c', spd: 2.2 }); }
@@ -462,18 +465,61 @@ function updateBoss(W) {
   const hx = px(h.x) + HOX, hy = px(h.y) + HOY, bx = px(b.x) + 2, by = px(b.y) - 12;
   if (hx < bx + 28 && hx + HW > bx && hy < by + 28 && hy + HH > by) {
     if (h.vy > 0 && hy + HH - 1 < by + 12) {
-      if (b.inv === 0) {
-        b.hp--; b.inv = 70; addScore(W, 1000, bx + 14, by - 6); sfx(W, 'bosshit'); W.freeze = 6; W.shake = 3;
-        emit(W, 'sparks', { x: bx + 14, y: by + 4, n: 18, col: '#ffd27a', spd: 2 });
-        if (b.hp <= 0) {
-          b.dead = true; b.vy = -0x04000; b.vx = -dir * 0x00800; addScore(W, 5000, bx + 14, by - 16); sfx(W, 'bossdown');
-          for (let c = 0; c < W.LW; c++) for (let r = 0; r < LH; r++) if (W.g[r][c] === 'X') { W.g[r][c] = '.'; emit(W, 'debris', { c, r, gate: true }); }
-          W.lock = null; W.shots = []; emit(W, 'music', { boss: false }); W.shake = 5;
-        }
-      }
+      if (b.inv === 0) hitBoss(W, b, dir);
       h.vy = -0x05000; h.hold = JUMPS[2].hold; h.fall = JUMPS[2].fall; h.sx = 1.25; h.sy = 0.8; h.ground = false; h.plat = null;
     } else if (b.inv === 0) hurtHero(W);
   }
+}
+
+function hitBoss(W, b, dir) {
+  const bx = px(b.x) + 2, by = px(b.y) - 12;
+  b.hp--; b.inv = 70; b.burn = 0; addScore(W, 1000, bx + 14, by - 6); sfx(W, 'bosshit'); W.freeze = 6; W.shake = 3;
+  emit(W, 'sparks', { x: bx + 14, y: by + 4, n: 18, col: '#ffd27a', spd: 2 });
+  if (b.hp <= 0) {
+    b.dead = true; b.vy = -0x04000; b.vx = -dir * 0x00800; addScore(W, 5000, bx + 14, by - 16); sfx(W, 'bossdown');
+    for (let c = 0; c < W.LW; c++) for (let r = 0; r < LH; r++) if (W.g[r][c] === 'X') { W.g[r][c] = '.'; emit(W, 'debris', { c, r, gate: true }); }
+    W.lock = null; W.shots = []; W.bolts = []; emit(W, 'music', { boss: false }); W.shake = 5;
+  }
+}
+
+// ---------- thrown embers (fire blossom) ----------
+// Run or Fire pressed while holding the fire blossom throws an ember from the lantern hand. It bounces along
+// floors, bursts on walls and water, flips any enemy it touches, and every BOSS_HITS embers cost a boss one heart.
+function throwEmber(W) {
+  const h = W.hero;
+  if (h.wet || W.bolts.length >= FIREBALL.MAX) return;
+  h.fireCD = FIREBALL.AUTO;
+  W.bolts.push({ x: h.x + (h.face > 0 ? 12 : 0) * SUB, y: h.y + 4 * SUB, vx: h.face * FIREBALL.VX, vy: FIREBALL.VY });
+  h.throwT = 10; sfx(W, 'fireball');
+}
+function burst(W, o, sx, sy) { o.gone = true; emit(W, 'sparks', { x: sx, y: sy, n: 8, col: '#ff9a4a', spd: 1.4 }); }
+function updateBolts(W) {
+  for (const o of W.bolts) {
+    o.x += o.vx;
+    let sx = px(o.x) + 4, sy = px(o.y) + 4;
+    if (solidPx(W, sx + Math.sign(o.vx) * 3, sy)) { burst(W, o, sx, sy); sfx(W, 'bump'); continue; }
+    const prevB = sy + 3;
+    o.vy += FIREBALL.GRAV; if (o.vy > FIREBALL.MAX_FALL) o.vy = FIREBALL.MAX_FALL;
+    o.y += o.vy; sy = px(o.y) + 4;
+    if (o.vy > 0 && floorPx(W, sx, sy + 3, prevB)) { o.y = (Math.floor((sy + 3) / 16) * 16 - 8) * SUB; o.vy = -FIREBALL.BOUNCE; sy = px(o.y) + 4; }
+    else if (o.vy < 0 && solidPx(W, sx, sy - 3)) o.vy = 0;
+    const t = tileOfPx(W, sx, sy);
+    if (t === '~' || t === 'V') { burst(W, o, sx, sy); continue; }
+    if (sy > VH + 16 || sx < W.camX - 8 || sx > W.camX + VIEW_W + 8) { o.gone = true; continue; }
+    for (const e of W.enemies) if (!e.dead && !e.gone) {
+      const ex = px(e.x) + 1, ey = px(e.y) + 3;
+      if (sx + 3 > ex && sx - 3 < ex + 14 && sy + 3 > ey && sy - 3 < ey + 13) { flipEnemy(W, e, 200); e.vx = Math.sign(o.vx) * 0x00800; burst(W, o, sx, sy); break; }
+    }
+    const b = W.boss;
+    if (!o.gone && b && !b.dead) {
+      const bx = px(b.x) + 2, by = px(b.y) - 12;
+      if (sx + 3 > bx && sx - 3 < bx + 28 && sy + 3 > by && sy - 3 < by + 28) {
+        burst(W, o, sx, sy);
+        if (b.inv === 0) { if (++b.burn >= FIREBALL.BOSS_HITS) hitBoss(W, b, Math.sign(o.vx)); else { sfx(W, 'sizzle'); b.flash = 8; } }
+      }
+    }
+  }
+  W.bolts = W.bolts.filter(o => !o.gone);
 }
 
 // ---------- doors ----------
@@ -513,7 +559,7 @@ function updateGoal(W) {
     if (px(h.x) + 8 >= (W.hut + 2) * 16 + 8) { h.hidden = true; W.state = 'tally'; W.t = 0; }
   } else if (W.state === 'tally') {
     if (W.time > 0) { const n = Math.min(W.time, 2); W.time -= n; W.score += n * 50; if (W.t % 3 === 0) sfx(W, 'tick'); }
-    else if (W.t > 30) { W.state = 'done'; W.t = 0; W.keepGlow = h.glow; }
+    else if (W.t > 30) { W.state = 'done'; W.t = 0; W.keepGlow = h.glow; W.keepFlame = h.flame; }
   }
 }
 
@@ -546,12 +592,17 @@ export function step(W, inp) {
     updatePlats(W);
     updateHero(W, inp);
     if (W.state === 'play') {
+      const h = W.hero;
+      if (h.throwT > 0) h.throwT--;
+      if (h.fireCD > 0) h.fireCD--;
+      // a press always throws (if a slot is free); holding the fire button keeps throwing
+      if (h.flame && (inp.fireP || (inp.fire && h.fireCD === 0))) throwEmber(W);
       updateCamera(W, false);
       if (++W.tick >= 24) { W.tick = 0; W.time--; if (W.time === 100) sfx(W, 'hurry'); if (W.time <= 0) { W.time = 0; killHero(W, false); } }
     }
   } else { updatePlats(W); updateGoal(W); }
   for (const s of W.springs) if (s.sq > 0) s.sq--;
-  spawnEntities(W); updateEnemies(W); updateItems(W); updateShots(W); updateBoss(W); updateFire(W);
+  spawnEntities(W); updateEnemies(W); updateItems(W); updateBolts(W); updateShots(W); updateBoss(W); updateFire(W);
   const sky = W.lv.sky || [0, 1];
   W.prog = sky[0] + (sky[1] - sky[0]) * clamp(W.camX / Math.max(1, W.PX - VIEW_W), 0, 1);
 }
@@ -559,7 +610,7 @@ export function step(W, inp) {
 // Cheap deep copy for search tools (solver). Events and fx are dropped.
 export function cloneWorld(W) {
   const C = { ...W, g: W.g.map(r => r.slice()), hero: { ...W.hero }, enemies: W.enemies.map(e => ({ ...e })), items: W.items.map(i => ({ ...i })),
-    shots: W.shots.map(s => ({ ...s })), plats: W.plats.map(p => ({ ...p })), springs: W.springs.map(s => ({ ...s })),
+    shots: W.shots.map(s => ({ ...s })), bolts: W.bolts.map(o => ({ ...o })), plats: W.plats.map(p => ({ ...p })), springs: W.springs.map(s => ({ ...s })),
     gemList: W.gemList.map(g => ({ ...g })), multi: { ...W.multi }, fire: W.fire, boss: W.boss && { ...W.boss }, lock: W.lock && { ...W.lock }, ev: [] };
   if (W.hero.plat) C.hero.plat = C.plats[W.plats.indexOf(W.hero.plat)];
   return C;

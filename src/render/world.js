@@ -154,12 +154,12 @@ export function drawDusky(W) {
   const cx = h.x / SUB + 8, by = h.y / SUB + 16, dying = W.state === 'dying' || W.state === 'dead';
   ctx.save();
   if (h.inv > 0 && (h.inv >> 2) % 2) ctx.globalAlpha = 0.35;
-  if (!dying) { ctx.strokeStyle = h.glow ? '#fff0a8' : '#ff8a3d'; ctx.lineWidth = 2.1; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); V.scarf.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.stroke(); }
+  if (!dying) { ctx.strokeStyle = h.flame ? '#ff6a4a' : h.glow ? '#fff0a8' : '#ff8a3d'; ctx.lineWidth = 2.1; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); V.scarf.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.stroke(); }
   ctx.translate(cx, by);
   if (dying) { ctx.translate(0, -9); ctx.rotate(Math.min(W.t, 30) * 0.12); ctx.translate(0, 9); }
   ctx.scale(h.sx * h.face, h.sy);
   if (h.ground && !dying && !h.wet) { ctx.fillStyle = 'rgba(8,4,20,.35)'; ctx.beginPath(); ctx.ellipse(0, 0, 6.5, 1.3, 0, 0, 7); ctx.fill(); }
-  const cloakA = h.glow ? '#ffd07a' : '#4fe0cf', cloakB = h.glow ? '#d86a1c' : '#0f6f6a';
+  const cloakA = h.flame ? '#fff0d8' : h.glow ? '#ffd07a' : '#4fe0cf', cloakB = h.flame ? '#e0402a' : h.glow ? '#d86a1c' : '#0f6f6a';
   const moving = ((h.ground && h.vx !== 0) || W.state === 'walkout') && !dying;
   [-1, 1].forEach(i => {
     let lx = i * 2.4, ly = 0;
@@ -186,8 +186,9 @@ export function drawDusky(W) {
   [[0.2, -15.2], [3.3, -15.2]].forEach(([ex, ey]) => { ctx.beginPath(); ctx.ellipse(ex, ey, 0.85, 1.35 * blink, 0, 0, 7); ctx.fill(); });
   if (blink === 1) { ctx.fillStyle = '#fff'; ctx.fillRect(0.3, -16.2, 0.5, 0.5); ctx.fillRect(3.4, -16.2, 0.5, 0.5); }
   if (!dying) {
-    ctx.strokeStyle = cloakB; ctx.lineWidth = 1.6; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(2.5, -9.5); ctx.lineTo(5.6, -8.6); ctx.stroke();
-    ctx.save(); ctx.translate(6, -8.8); ctx.rotate(V.lanA);
+    const thr = h.throwT > 0 ? h.throwT / 10 : 0, hx2 = 5.6 + thr * 2.4, hy2 = -8.6 - thr * 2.5;
+    ctx.strokeStyle = cloakB; ctx.lineWidth = 1.6; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(2.5, -9.5); ctx.lineTo(hx2, hy2); ctx.stroke();
+    ctx.save(); ctx.translate(hx2 + 0.4, hy2 - 0.2); ctx.rotate(V.lanA - thr * 0.8);
     ctx.strokeStyle = '#2a1a3a'; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 1.6); ctx.stroke();
     ctx.fillStyle = '#2a1a3a'; rr(ctx, -2, 1.5, 4, 5.2, 0.8); ctx.fill();
     const fl = 0.8 + Math.sin(f * 0.4) * 0.1 + Math.random() * 0.1;
@@ -200,7 +201,7 @@ export function drawDusky(W) {
     const lx = cx + h.face * h.sx * (6 + Math.sin(V.lanA) * 4), ly = by - 5;
     const fl = 1 + Math.sin(f * 0.3) * 0.05 + Math.random() * 0.04;
     R.lights.push([lx, ly, (h.glow ? 92 : 74) * fl * (R.theme.dark[0] > 0.4 ? 1.15 : 1), 1]); R.blooms.push([lx, ly, 16 * fl, 'rgba(255,190,100,0.35)']);
-    if (h.glow) R.blooms.push([cx, by - 9, 20, 'rgba(255,160,70,0.2)']);
+    if (h.glow) R.blooms.push([cx, by - 9, 20, h.flame ? 'rgba(255,100,60,0.24)' : 'rgba(255,160,70,0.2)']);
   }
 }
 
@@ -335,6 +336,18 @@ export function drawItem(it) {
     ctx.fillStyle = '#ffb65c'; ctx.fillRect(-3, -3.5, 6, 7); ctx.fillStyle = '#fff4c8'; ctx.beginPath(); ctx.ellipse(0, 0.5, 1.1, 2, 0, 0, 7); ctx.fill();
     ctx.restore(); R.lights.push([x, y, 44, 0.8]); R.blooms.push([x, y, 12, 'rgba(255,200,120,0.3)']); return;
   }
+  if (it.k === 'flame') {
+    // Fire blossom: a stem and leaves under five flickering flame petals around a white-hot heart.
+    ctx.fillStyle = '#3f8a4a'; ctx.fillRect(x - 0.6, y - 1, 1.2, 7);
+    ctx.beginPath(); ctx.ellipse(x - 2.6, y + 3.5, 2.6, 1, -0.5, 0, 7); ctx.ellipse(x + 2.6, y + 3.5, 2.6, 1, 0.5, 0, 7); ctx.fill();
+    for (let i = 0; i < 5; i++) {
+      const a = i / 5 * Math.PI * 2 + f * 0.05, l = 4.2 + Math.sin(f * 0.4 + i * 1.7) * 0.8;
+      ctx.fillStyle = i % 2 ? '#ff5a2a' : '#ff9a3a';
+      ctx.beginPath(); ctx.ellipse(x + Math.cos(a) * 2.6, y - 4 + Math.sin(a) * 2.6, l * 0.55, 1.6, a, 0, 7); ctx.fill();
+    }
+    ctx.fillStyle = '#fff4c8'; ctx.beginPath(); ctx.arc(x, y - 4, 1.8, 0, 7); ctx.fill();
+    R.lights.push([x, y - 4, 50, 0.9]); R.blooms.push([x, y - 4, 14, 'rgba(255,110,60,0.35)']); return;
+  }
   const s = 1 + Math.sin(f * 0.3) * 0.06;
   const g = ctx.createRadialGradient(x, y + 1, 0.5, x, y, 7); g.addColorStop(0, '#fffbe0'); g.addColorStop(0.35, '#ffd070'); g.addColorStop(0.7, '#ff7a3a'); g.addColorStop(1, 'rgba(255,90,40,0)');
   ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x, y - 8 * s + Math.sin(f * 0.25)); ctx.bezierCurveTo(x + 6 * s, y - 2, x + 5 * s, y + 5, x, y + 5); ctx.bezierCurveTo(x - 5 * s, y + 5, x - 6 * s, y - 2, x, y - 8 * s); ctx.fill();
@@ -397,6 +410,17 @@ export function drawShot(s) {
   }
 }
 
+// A thrown ember: a spinning white-hot core with four flame tongues and a short trail.
+export function drawBolt(o) {
+  const { ctx } = R, x = o.x / SUB + 4, y = o.y / SUB + 4, a = R.frame * 0.5 * Math.sign(o.vx);
+  ctx.fillStyle = 'rgba(255,120,60,0.35)'; ctx.beginPath(); ctx.arc(x - o.vx / SUB * 1.2, y - o.vy / SUB * 1.2, 2.2, 0, 7); ctx.fill();
+  ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+  ctx.fillStyle = '#ff6a2a'; ctx.beginPath(); for (let i = 0; i < 8; i++) { const r = i % 2 ? 1.6 : 3.6, t = i / 8 * Math.PI * 2; ctx.lineTo(Math.cos(t) * r, Math.sin(t) * r); } ctx.fill();
+  ctx.fillStyle = '#ffd070'; ctx.beginPath(); ctx.arc(0, 0, 1.8, 0, 7); ctx.fill();
+  ctx.fillStyle = '#fffbe0'; ctx.fillRect(-0.7, -0.7, 1.4, 1.4);
+  ctx.restore(); R.lights.push([x, y, 34, 0.8]); R.blooms.push([x, y, 9, 'rgba(255,140,70,0.35)']);
+}
+
 // ---------- bosses ----------
 // Gloomlings: shadow creatures that hoard the dusk. Colors shift per world.
 const BOSS_COL = [null,
@@ -430,6 +454,7 @@ export function drawBoss(W) {
   ctx.strokeStyle = c2; ctx.lineWidth = 1.5; if (angry) { ctx.beginPath(); ctx.moveTo(-9, -21); ctx.lineTo(-2, -18.5); ctx.moveTo(9, -21); ctx.lineTo(2, -18.5); ctx.stroke(); }
   ctx.fillStyle = eye; ctx.globalAlpha *= 0.8; ctx.beginPath(); ctx.moveTo(-4, -8); for (let i = 0; i <= 4; i++) ctx.lineTo(-4 + i * 2.5, -8 + (i % 2 ? 2 : 0)); ctx.lineTo(6, -7); ctx.lineTo(-4, -7); ctx.fill();
   ctx.restore();
+  if (b.flash > 0) R.blooms.push([x, y - 16, 20, `rgba(255,140,70,${0.05 * b.flash})`]);
   R.blooms.push([x, y - 16, 22, 'rgba(120,60,180,0.12)']);
   R.lights.push([x + 3 * b.face, y - 16, 30, 0.4]);
 }
